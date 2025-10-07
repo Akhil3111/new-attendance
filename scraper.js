@@ -81,12 +81,32 @@ async function getAttendanceData(username, password) {
 
     // 1. Go to login page
     await driver.get('https://login.vardhaman.org/');
-    await driver.wait(until.elementLocated(By.name('txtuser')), 30000);
+
+    // Wait until username field is visible
+    const usernameField = await driver.wait(
+      until.elementLocated(By.name('txtuser')),
+      60000
+    );
+    await driver.wait(until.elementIsVisible(usernameField), 60000);
+
+    // Wait for password field
+    const passwordField = await driver.wait(
+      until.elementLocated(By.name('txtpass')),
+      60000
+    );
+    await driver.wait(until.elementIsVisible(passwordField), 60000);
+
+    // Wait for login button
+    const loginBtn = await driver.wait(
+      until.elementLocated(By.name('btnLogin')),
+      60000
+    );
+    await driver.wait(until.elementIsVisible(loginBtn), 60000);
 
     // 2. Login
-    await driver.findElement(By.name('txtuser')).sendKeys(username);
-    await driver.findElement(By.name('txtpass')).sendKeys(password);
-    await driver.findElement(By.name('btnLogin')).click();
+    await usernameField.sendKeys(username);
+    await passwordField.sendKeys(password);
+    await loginBtn.click();
     await driver.sleep(3000);
 
     // 3. Close pop-up if exists
@@ -95,6 +115,7 @@ async function getAttendanceData(username, password) {
         until.elementLocated(By.xpath('//*[@id="ctl00_ContentPlaceHolder1_PopupCTRLMain_Image2"]')),
         5000
       );
+      await driver.wait(until.elementIsVisible(popupClose), 5000);
       await popupClose.click();
     } catch (e) { /* ignore if no popup */ }
 
@@ -105,6 +126,7 @@ async function getAttendanceData(username, password) {
       until.elementLocated(By.xpath('//*[@id="ctl00_ContentPlaceHolder1_divAttendance"]/div[3]/a/div[2]')),
       10000
     );
+    await driver.wait(until.elementIsVisible(attendanceBtn), 10000);
     await attendanceBtn.click();
     await driver.sleep(3000);
 
@@ -115,6 +137,7 @@ async function getAttendanceData(username, password) {
         until.elementLocated(By.css('.attendance-count')),
         5000
       );
+      await driver.wait(until.elementIsVisible(totalElem), 5000);
       totalPercentage = await totalElem.getText();
     } catch (e) { /* ignore */ }
 
