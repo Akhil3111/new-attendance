@@ -1,0 +1,25 @@
+{
+  "name": "mern-attendance-app",
+  "version": "1.0.0",
+  "description": "A MERN application for automated college attendance reports.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "axios": "^1.12.2",
+    "body-parser": "^1.20.3",
+    "chromedriver": "^141.0.0",
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2",
+    "mongoose": "^8.19.1",
+    "path": "^0.12.7",
+    "puppeteer-core": "^22.15.0",
+    "selenium-webdriver": "^4.36.0",
+    "twilio": "^4.23.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}
