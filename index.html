@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Attendance Dashboard</title>
+    <!-- React and Babel for JSX -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Three.js for 3D Background -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0d1117;
+            color: #c9d1d9;
+            /* CRITICAL FIX: Removed overflow: hidden; to allow scrolling */
+        }
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: -1;
+            width: 100vw;
+            height: 100vh;
+        }
+        .dashboard-container {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* CRITICAL FIX: Align to top so content doesn't center and overflow */
+            min-height: 100vh;
+            padding: 40px 20px; /* Added more vertical padding */
+            box-sizing: border-box;
+            background-color: rgba(13, 17, 23, 0.6);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            /* Allows the main body scrollbar to appear when content overflows */
+        }
+        .card {
+            background-color: rgba(22, 27, 34, 0.9);
+            border: 1px solid #30363d;
+            margin-top: 20px; /* Space from the top */
+            margin-bottom: 20px; /* Space at the bottom */
+        }
+        .status-present {
+            background-color: #238636;
+            color: white;
+        }
+        .status-absent {
+            background-color: #d13232;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="bg-canvas"></canvas>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const App = () => {
+            const [username, setUsername] = useState('');
+            const [password, setPassword] = useState('');
+            const [whatsapp, setWhatsapp] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [error, setError] = useState('');
+            const [data, setData] = useState(null);
+            const [optInInstruction, setOptInInstruction] = useState('');
+
+            // Function to generate a unique ID for new users before MongoDB assigns one
+            const generateUserId = () => 'user_' + Date.now() + Math.floor(Math.random() * 1000);
+
+            const handleScrape = async () => {
+                setError('');
+                setData(null);
+                setOptInInstruction('');
+                setLoading(true);
+
+                if (!username || !password || !whatsapp) {
+                    setError('Please fill in all fields.');
+                    setLoading(false);
+                    return;
+                }
+
+                try {
+                    // CRITICAL FIX: Use the correct API endpoint path
+                    const response = await fetch('/api/scrape', { 
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            userId: generateUserId(), 
+                            username: username,
+                            password: password,
+                            whatsapp: whatsapp,
+                        }),
+                    });
+
+                    const result = await response.json();
+                    if (response.ok) {
+                        setData(result.data);
+                        setOptInInstruction(result.optInInstruction);
+                    } else {
+                        setError(result.error || 'An unknown error occurred on the server.');
+                    }
+                } catch (err) {
+                    setError('Could not connect to the Express server. Please check your backend.');
+                    console.error('Fetch error:', err);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            // Three.js Background Animation Logic
+            useEffect(() => {
+                const canvas = document.getElementById('bg-canvas');
+                const scene = new THREE.Scene();
+                const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                const renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true });
+                renderer.setSize(window.innerWidth, window.innerHeight);
+
+                const particlesGeometry = new THREE.BufferGeometry();
+                const particlesCount = 1000;
+                const posArray = new Float32Array(particlesCount * 3);
+                for(let i = 0; i < particlesCount * 3; i++) {
+                    // Random positions spread across a large area
+                    posArray[i] = (Math.random() - 0.5) * 100;
+                }
+                particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+
+                const particlesMaterial = new THREE.PointsMaterial({
+                    size: 0.1,
+                    color: 0x8888ff, // Light blue/purple color
+                });
+
+                const particleMesh = new THREE.Points(particlesGeometry, particlesMaterial);
+                scene.add(particleMesh);
+
+                camera.position.z = 50;
+
+                const mouse = { x: 0, y: 0 };
+                window.addEventListener('mousemove', (event) => {
+                    // Normalize mouse coordinates for subtle movement effect
+                    mouse.x = (event.clientX / window.innerWidth) * 0.1;
+                    mouse.y = -(event.clientY / window.innerHeight) * 0.1;
+                });
+
+                const animate = () => {
+                    requestAnimationFrame(animate);
+
+                    // Gentle, automatic rotation for depth illusion
+                    particleMesh.rotation.x += 0.0001; 
+                    particleMesh.rotation.y += 0.0002;
+
+                    // Subtle camera movement based on mouse position
+                    camera.position.x += (mouse.x * 5 - camera.position.x) * 0.05;
+                    camera.position.y += (mouse.y * 5 - camera.position.y) * 0.05;
+
+                    renderer.render(scene, camera);
+                };
+                animate();
+
+                const handleResize = () => {
+                    camera.aspect = window.innerWidth / window.innerHeight;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                };
+                window.addEventListener('resize', handleResize);
+
+                return () => {
+                    window.removeEventListener('resize', handleResize);
+                };
+            }, []);
+
+            return (
+                <div className="dashboard-container">
+                    <div className="card w-full max-w-xl rounded-2xl p-8 shadow-2xl">
+                        <h1 className="text-4xl font-extrabold text-center mb-2 text-blue-400">VCE Attendance Bot</h1>
+                        <p className="text-center text-sm text-gray-400 mb-6">Securely register for instant & daily attendance reports.</p>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-1">Username (Roll No.)</label>
+                                <input
+                                    type="text"
+                                    className="w-full p-3 rounded-lg border border-gray-600 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                    placeholder="e.g., 23881A12B2"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-1">Password</label>
+                                <input
+                                    type="password"
+                                    className="w-full p-3 rounded-lg border border-gray-600 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    placeholder="Your college password"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-1">WhatsApp Number (e.g., +919876543210)</label>
+                                <input
+                                    type="tel"
+                                    className="w-full p-3 rounded-lg border border-gray-600 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    value={whatsapp}
+                                    onChange={(e) => setWhatsapp(e.target.value)}
+                                    placeholder="+91..."
+                                />
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={handleScrape}
+                            className={`w-full mt-6 p-3 rounded-lg font-semibold text-white transition-all duration-300 shadow-lg ${loading ? 'bg-gray-500 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
+                            disabled={loading}
+                        >
+                            {loading ? (
+                                <div className="flex items-center justify-center">
+                                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Processing...
+                                </div>
+                            ) : 'Register & Get Instant Report'}
+                        </button>
+
+                        {error && (
+                            <div className="mt-4 p-3 bg-red-800 text-red-100 rounded-lg text-center font-medium">
+                                {error}
+                            </div>
+                        )}
+
+                        {optInInstruction && (
+                            <div className="mt-4 p-4 bg-yellow-800 text-yellow-100 border border-yellow-600 rounded-lg">
+                                <h3 className="font-bold mb-2">Setup Complete! Now Opt-In:</h3>
+                                <p className="whitespace-pre-wrap text-sm">{optInInstruction}</p>
+                                <p className="text-xs mt-2 opacity-80">This step is required by Twilio for automated reports.</p>
+                            </div>
+                        )}
+
+                        {data && (
+                            <div className="mt-6 p-6 bg-gray-800 rounded-xl border border-gray-700">
+                                <h2 className="text-xl font-bold mb-4 text-center">Current Attendance Status</h2>
+                                <div className="text-center mb-4">
+                                    <span className="text-5xl font-extrabold" style={{ color: data.total_percentage && parseFloat(data.total_percentage) >= 75 ? '#238636' : '#d13232' }}>
+                                        {data.total_percentage || 'N/A'}
+                                    </span>
+                                    <p className="text-sm text-gray-400 mt-1">Overall Attendance</p>
+                                </div>
+                                
+                                <h3 className="font-bold text-gray-300 mb-2 mt-4">Subject Breakdown:</h3>
+                                <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
+                                    {data.subjects.map((subject, index) => (
+                                        <div key={index} className="flex items-center justify-between p-3 rounded-lg transition-all duration-200" style={{ backgroundColor: subject.status === "Present" ? 'rgba(35, 134, 54, 0.1)' : 'rgba(209, 50, 50, 0.1)' }}>
+                                            <div>
+                                                <p className="text-sm font-medium text-gray-200">{subject.subject}</p>
+                                                <p className="text-xs text-gray-400">{subject.time_slot}</p>
+                                            </div>
+                                            <div className={`px-3 py-1 rounded-full text-xs font-bold ${subject.status === "Present" ? 'status-present' : 'status-absent'}`}>
+                                                {subject.status}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
+
+
